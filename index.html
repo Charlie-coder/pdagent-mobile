@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
@@ -11,86 +11,553 @@
 <title>PDAgent</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0b10;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  height:100vh;height:100dvh;overflow:hidden}
-.loader{display:flex;align-items:center;justify-content:center;height:100%;text-align:center;
-  position:absolute;inset:0;z-index:10;background:#0a0b10}
-.loader.hidden{display:none}
-.container{padding:24px}
-.logo{font-size:48px;font-weight:800;color:#3b82f6;margin-bottom:16px;letter-spacing:-1px}
-.status{font-size:15px;color:#94a3b8;margin-bottom:24px}
-.spinner{width:32px;height:32px;border:3px solid #1e293b;border-top-color:#3b82f6;border-radius:50%;
-  animation:spin .8s linear infinite;margin:0 auto 20px}
+:root{
+  --bg:#0a0b10;--surface:#14151f;--surface2:#1e1f2e;
+  --text:#e5e7eb;--text-dim:#9ca3af;--text-muted:#6b7280;
+  --accent:#3b82f6;--accent-dim:#1e40af;
+  --user-bg:#1e3a5f;--agent-bg:#1e1f2e;
+  --border:#2a2b3d;--danger:#ef4444;--success:#22c55e;
+  --radius:16px;--radius-sm:10px;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+/* loading screen */
+#loader{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;
+  justify-content:center;z-index:200;text-align:center}
+#loader.hidden{display:none}
+.loader-logo{font-size:48px;font-weight:800;color:var(--accent);margin-bottom:16px;letter-spacing:-1px}
+.loader-status{font-size:15px;color:#94a3b8;margin-bottom:24px}
+.loader-spinner{width:32px;height:32px;border:3px solid #1e293b;border-top-color:var(--accent);
+  border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 20px}
 @keyframes spin{to{transform:rotate(360deg)}}
-.error{color:#f87171;display:none;margin-top:16px;font-size:14px}
-.retry-btn{display:none;margin-top:12px;background:#3b82f6;color:#fff;border:none;border-radius:8px;
-  padding:10px 24px;font-size:14px;cursor:pointer}
-.retry-btn:active{background:#2563eb}
-#app-frame{position:absolute;inset:0;width:100%;height:100%;border:none;display:none}
+.loader-error{color:#f87171;display:none;margin-top:16px;font-size:14px}
+.loader-retry{display:none;margin-top:12px;background:var(--accent);color:#fff;border:none;
+  border-radius:8px;padding:10px 24px;font-size:14px;cursor:pointer}
+
+/* layout */
+#app{display:none;flex-direction:column;height:100%;height:100dvh}
+#app.show{display:flex}
+#header{flex:0 0 auto;display:flex;align-items:center;gap:8px;
+  padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));
+  background:var(--surface);border-bottom:1px solid var(--border)}
+#header h1{font-size:16px;font-weight:600;flex:1}
+#status{font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
+#status.ok{background:#16532d;color:#86efac}
+#status.connecting{background:#713f12;color:#fcd34d}
+#status.error{background:#7f1d1d;color:#fca5a5}
+
+#messages{flex:1;overflow-y:auto;padding:12px 12px 8px;
+  -webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+.msg{display:flex;margin-bottom:10px;gap:8px;max-width:100%}
+.msg.user{justify-content:flex-end}
+.msg.agent{justify-content:flex-start}
+.bubble{max-width:85%;padding:10px 14px;border-radius:var(--radius);
+  word-break:break-word;font-size:15px;line-height:1.55;position:relative}
+.msg.user .bubble{background:var(--user-bg);border-bottom-right-radius:4px}
+.msg.agent .bubble{background:var(--agent-bg);border-bottom-left-radius:4px}
+.bubble p{margin:0 0 8px} .bubble p:last-child{margin:0}
+.bubble pre{background:#0d0e17;padding:10px 12px;border-radius:var(--radius-sm);
+  overflow-x:auto;margin:8px 0;font-size:13px;line-height:1.45}
+.bubble code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:13px}
+.bubble :not(pre)>code{background:#0d0e17;padding:2px 5px;border-radius:4px}
+.bubble strong{font-weight:600}
+.bubble em{font-style:italic;color:var(--text-dim)}
+.bubble ul,.bubble ol{padding-left:20px;margin:6px 0}
+.bubble a{color:var(--accent);text-decoration:underline}
+.bubble blockquote{border-left:3px solid var(--border);padding-left:10px;
+  margin:6px 0;color:var(--text-dim)}
+.bubble img{max-width:100%;border-radius:8px;margin:6px 0}
+
+.tool-indicator{display:inline-flex;align-items:center;gap:5px;
+  font-size:12px;color:var(--text-muted);padding:4px 0}
+.tool-indicator .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);
+  animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+
+.typing{display:flex;gap:4px;padding:8px 14px;align-items:center}
+.typing span{width:7px;height:7px;border-radius:50%;background:var(--text-muted);
+  animation:bounce .6s infinite alternate}
+.typing span:nth-child(2){animation-delay:.15s}
+.typing span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{to{transform:translateY(-4px);opacity:.5}}
+
+.meta{font-size:11px;color:var(--text-muted);margin-top:4px;text-align:right}
+
+/* input area */
+#input-area{flex:0 0 auto;display:flex;gap:8px;align-items:flex-end;
+  padding:8px 12px;padding-bottom:max(8px,var(--safe-bottom));
+  background:var(--surface);border-top:1px solid var(--border)}
+#input{flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:22px;padding:10px 16px;font-size:15px;line-height:1.4;resize:none;
+  font-family:inherit;outline:none;max-height:120px;min-height:42px;
+  transition:border-color .15s}
+#input:focus{border-color:var(--accent)}
+#input::placeholder{color:var(--text-muted)}
+#send{width:42px;height:42px;border-radius:50%;border:none;
+  background:var(--accent);color:#fff;font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:opacity .15s}
+#send:disabled{opacity:.3;cursor:default}
+#send:active:not(:disabled){opacity:.7}
+
+/* commands bar */
+#commands{display:none;gap:6px;padding:4px 12px;background:var(--surface);
+  overflow-x:auto;flex-shrink:0}
+#commands.show{display:flex}
+.cmd-btn{font-size:12px;padding:4px 10px;border-radius:14px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--text-dim);white-space:nowrap;cursor:pointer}
+.cmd-btn:active{background:var(--accent-dim);color:#fff;border-color:var(--accent)}
+
+/* session panel */
+#session-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100}
+#session-overlay.show{display:block}
+#session-panel{position:fixed;top:0;right:-280px;width:280px;height:100%;
+  background:var(--surface);z-index:101;transition:right .25s ease;
+  display:flex;flex-direction:column;border-left:1px solid var(--border)}
+#session-panel.show{right:0}
+#session-panel-header{padding:16px;display:flex;align-items:center;gap:8px;
+  border-bottom:1px solid var(--border)}
+#session-panel-header h2{flex:1;font-size:15px;font-weight:600}
+#session-panel-close{background:none;border:none;color:var(--text-dim);font-size:20px;
+  cursor:pointer;padding:4px 8px}
+#session-list{flex:1;overflow-y:auto;padding:8px}
+.session-item{display:flex;align-items:center;gap:8px;padding:10px 12px;
+  border-radius:var(--radius-sm);cursor:pointer;margin-bottom:4px;
+  transition:background .15s}
+.session-item:active,.session-item.active{background:var(--accent-dim)}
+.session-item .s-name{flex:1;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-item .s-dot{width:8px;height:8px;border-radius:50%;background:var(--text-muted);flex-shrink:0}
+.session-item.active .s-dot{background:var(--success)}
+#new-session-area{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px}
+#new-session-input{flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:8px;padding:8px 12px;font-size:13px;outline:none;font-family:inherit}
+#new-session-input::placeholder{color:var(--text-muted)}
+#new-session-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;
+  padding:8px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+
+/* scrollbar */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 </style>
 </head>
 <body>
-<div class="loader" id="loader">
-  <div class="container">
-    <div class="logo">PD</div>
-    <div class="spinner" id="spinner"></div>
-    <div class="status" id="status">Connecting to PDAgent…</div>
-    <div class="error" id="error"></div>
-    <button class="retry-btn" id="retry">Retry</button>
+
+<div id="loader">
+  <div>
+    <div class="loader-logo">PD</div>
+    <div class="loader-spinner" id="loader-spinner"></div>
+    <div class="loader-status" id="loader-status">Connecting to PDAgent…</div>
+    <div class="loader-error" id="loader-error"></div>
+    <button class="loader-retry" id="loader-retry">Retry</button>
   </div>
 </div>
-<iframe id="app-frame" allow="clipboard-write"></iframe>
-<script>
-const GIST_RAW = "https://gist.githubusercontent.com/Charlie-coder/1b492ad9a8842b2942c29ac8bb872cb4/raw/pdagent.json";
-const loaderEl = document.getElementById("loader");
-const statusEl = document.getElementById("status");
-const errorEl = document.getElementById("error");
-const retryBtn = document.getElementById("retry");
-const spinnerEl = document.getElementById("spinner");
-const frameEl = document.getElementById("app-frame");
 
-async function loadApp() {
-  loaderEl.classList.remove("hidden");
-  frameEl.style.display = "none";
-  statusEl.textContent = "Connecting to PDAgent…";
-  errorEl.style.display = "none";
-  retryBtn.style.display = "none";
-  spinnerEl.style.display = "block";
+<div id="app">
+  <div id="header">
+    <h1 id="session-title">PDAgent</h1>
+    <span id="status" class="connecting">Connecting…</span>
+    <button id="sessions-btn" style="background:none;border:1px solid var(--border);color:var(--text-dim);
+      border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap">Sessions</button>
+  </div>
+  <div id="session-overlay"></div>
+  <div id="session-panel">
+    <div id="session-panel-header">
+      <h2>Sessions</h2>
+      <button id="session-panel-close">&times;</button>
+    </div>
+    <div id="session-list"></div>
+    <div id="new-session-area">
+      <input id="new-session-input" placeholder="New session name…">
+      <button id="new-session-btn">Create</button>
+    </div>
+  </div>
+  <div id="commands">
+    <button class="cmd-btn" data-cmd="/clear">Clear</button>
+    <button class="cmd-btn" data-cmd="/model default">Default</button>
+    <button class="cmd-btn" data-cmd="/model fast">Fast</button>
+  </div>
+  <div id="messages"></div>
+  <div id="input-area">
+    <textarea id="input" rows="1" placeholder="Message PDAgent…" enterkeyhint="send"></textarea>
+    <button id="send" disabled aria-label="Send">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+const GIST_RAW = "https://gist.githubusercontent.com/Charlie-coder/1b492ad9a8842b2942c29ac8bb872cb4/raw/pdagent.json";
+
+let serverBase = "";
+let authToken = "";
+
+// ── Bootstrap: fetch tunnel URL from Gist ──
+
+async function bootstrap() {
+  const loaderEl = document.getElementById("loader");
+  const loaderStatus = document.getElementById("loader-status");
+  const loaderError = document.getElementById("loader-error");
+  const loaderRetry = document.getElementById("loader-retry");
+  const loaderSpinner = document.getElementById("loader-spinner");
+
+  loaderRetry.addEventListener("click", () => {
+    loaderError.style.display = "none";
+    loaderRetry.style.display = "none";
+    loaderSpinner.style.display = "block";
+    bootstrap();
+  });
 
   try {
+    loaderStatus.textContent = "Connecting to PDAgent…";
     const resp = await fetch(GIST_RAW + "?t=" + Date.now());
     if (!resp.ok) throw new Error("HTTP " + resp.status);
-    const text = await resp.text();
+    const data = await resp.json();
+    if (!data.url) throw new Error("PDAgent is not running");
 
-    let url;
-    try {
-      const data = JSON.parse(text);
-      url = data.url;
-    } catch {
-      const m = text.match(/\((https:\/\/[^)]+)\)/);
-      if (m) url = m[1];
-    }
+    const parsed = new URL(data.url);
+    authToken = parsed.searchParams.get("token") || "";
+    serverBase = parsed.origin;
 
-    if (url) {
-      statusEl.textContent = "Loading PDAgent…";
-      frameEl.src = url;
-      frameEl.style.display = "block";
-      frameEl.onload = () => { loaderEl.classList.add("hidden"); };
-      setTimeout(() => { loaderEl.classList.add("hidden"); }, 5000);
-    } else {
-      throw new Error("PDAgent is not running");
-    }
+    loaderEl.classList.add("hidden");
+    document.getElementById("app").classList.add("show");
+    initChat();
   } catch (e) {
-    spinnerEl.style.display = "none";
-    statusEl.textContent = "Could not connect";
-    errorEl.textContent = e.message;
-    errorEl.style.display = "block";
-    retryBtn.style.display = "inline-block";
+    loaderSpinner.style.display = "none";
+    loaderStatus.textContent = "Could not connect";
+    loaderError.textContent = e.message;
+    loaderError.style.display = "block";
+    loaderRetry.style.display = "inline-block";
   }
 }
 
-retryBtn.addEventListener("click", loadApp);
-loadApp();
+// ── Chat logic ──
+
+function initChat() {
+
+const $ = (s) => document.querySelector(s);
+const messagesEl = $("#messages");
+const inputEl = $("#input");
+const sendBtn = $("#send");
+const statusEl = $("#status");
+const sessionTitle = $("#session-title");
+
+let ws = null;
+let connected = false;
+let agentRunning = false;
+let currentStreamEl = null;
+let streamedText = "";
+let reconnectDelay = 1000;
+let currentSession = localStorage.getItem("pdagent_session") || "mobile";
+
+function md(text) {
+  if (!text) return "";
+  let html = text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre><code class="lang-${lang}">${code.trim()}</code></pre>`);
+  html = html.replace(/`([^`\n]+)`/g, "<code>$1</code>");
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
+  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "<em>$1</em>");
+  html = html.replace(/^#### (.+)$/gm, "<p><strong>$1</strong></p>");
+  html = html.replace(/^### (.+)$/gm, "<p><strong>$1</strong></p>");
+  html = html.replace(/^## (.+)$/gm, "<p><strong>$1</strong></p>");
+  html = html.replace(/^# (.+)$/gm, "<p><strong>$1</strong></p>");
+  html = html.replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>");
+  html = html.replace(/^[-*] (.+)$/gm, "<li>$1</li>");
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const parts = html.split(/\n{2,}/);
+  html = parts.map(p => {
+    p = p.trim();
+    if (!p) return "";
+    if (/^<(pre|blockquote|li|ul|ol|p|h[1-6])/.test(p)) return p;
+    return `<p>${p.replace(/\n/g, "<br>")}</p>`;
+  }).join("");
+  html = html.replace(/(<li>[\s\S]*?<\/li>)+/g, "<ul>$&</ul>");
+  return html;
+}
+
+function scrollToBottom() {
+  requestAnimationFrame(() => { messagesEl.scrollTop = messagesEl.scrollHeight; });
+}
+
+function addMessage(role, content, extra) {
+  const div = document.createElement("div");
+  div.className = `msg ${role}`;
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  if (role === "agent") { bubble.innerHTML = md(content); }
+  else { bubble.textContent = content; }
+  div.appendChild(bubble);
+  if (extra) {
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = extra;
+    div.appendChild(meta);
+  }
+  messagesEl.appendChild(div);
+  scrollToBottom();
+  return bubble;
+}
+
+function addToolIndicator(toolName, args) {
+  const ICONS = {
+    read_file:"📄",write_file:"✏️",edit_file:"✏️",
+    grep:"🔍",shell:"⚡",exec:"⚡",spawn:"🔀",
+    search:"🔍",terminal:"🖥️",note:"📝",memory:"🧠",
+  };
+  const icon = ICONS[toolName] || "▸";
+  const label = toolName.replace(/_/g, " ");
+  const shortArgs = args && args.length > 60 ? args.slice(0,60)+"…" : (args || "");
+  let container = messagesEl.querySelector(".tool-status-group:last-child");
+  if (!container) {
+    container = document.createElement("div");
+    container.className = "msg agent tool-status-group";
+    const inner = document.createElement("div");
+    inner.className = "bubble";
+    inner.style.padding = "6px 14px";
+    container.appendChild(inner);
+    messagesEl.appendChild(container);
+  }
+  const inner = container.querySelector(".bubble");
+  const line = document.createElement("div");
+  line.className = "tool-indicator";
+  line.innerHTML = `<span class="dot"></span> ${icon} <span>${label}</span> <span style="color:var(--text-muted);font-size:11px">${shortArgs}</span>`;
+  inner.appendChild(line);
+  scrollToBottom();
+}
+
+function removeToolIndicators() {
+  messagesEl.querySelectorAll(".tool-status-group").forEach(el => el.remove());
+}
+
+function showTyping() {
+  if (messagesEl.querySelector(".typing-indicator")) return;
+  const div = document.createElement("div");
+  div.className = "msg agent typing-indicator";
+  div.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  messagesEl.appendChild(div);
+  scrollToBottom();
+}
+
+function hideTyping() {
+  messagesEl.querySelectorAll(".typing-indicator").forEach(el => el.remove());
+}
+
+function startStream() {
+  hideTyping(); removeToolIndicators();
+  const div = document.createElement("div");
+  div.className = "msg agent";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.innerHTML = '<span class="dot" style="display:inline-block"></span>';
+  div.appendChild(bubble);
+  messagesEl.appendChild(div);
+  currentStreamEl = bubble;
+  streamedText = "";
+  scrollToBottom();
+}
+
+function appendStream(text) {
+  streamedText += text;
+  if (currentStreamEl) { currentStreamEl.innerHTML = md(streamedText); scrollToBottom(); }
+}
+
+function finalizeStream(fullText, durationMs) {
+  if (fullText && currentStreamEl) { currentStreamEl.innerHTML = md(fullText); }
+  else if (currentStreamEl && streamedText) { currentStreamEl.innerHTML = md(streamedText); }
+  if (durationMs && currentStreamEl) {
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = `${(durationMs/1000).toFixed(1)}s`;
+    currentStreamEl.parentElement.appendChild(meta);
+  }
+  currentStreamEl = null; streamedText = ""; scrollToBottom();
+}
+
+function setStatus(state, text) {
+  statusEl.className = state;
+  statusEl.textContent = text || state;
+}
+
+// ── WebSocket (connect to tunnel directly) ──
+
+function connect() {
+  if (ws) { ws.onclose = null; ws.close(); }
+  const wsBase = serverBase.replace(/^http/, "ws");
+  const url = `${wsBase}/ws/${currentSession}?token=${authToken}`;
+  setStatus("connecting", "Connecting…");
+  sessionTitle.textContent = currentSession === "mobile" ? "PDAgent" : currentSession;
+
+  ws = new WebSocket(url);
+
+  ws.onopen = () => {
+    connected = true; reconnectDelay = 1000;
+    setStatus("ok", "Connected");
+    sendBtn.disabled = false; inputEl.focus();
+  };
+
+  ws.onclose = () => {
+    connected = false; agentRunning = false; sendBtn.disabled = true;
+    setStatus("error", "Disconnected");
+    setTimeout(() => { reconnectDelay = Math.min(reconnectDelay*1.5, 15000); connect(); }, reconnectDelay);
+  };
+
+  ws.onerror = () => { setStatus("error", "Connection error"); };
+
+  ws.onmessage = (e) => {
+    let msg; try { msg = JSON.parse(e.data); } catch { return; }
+    handleMessage(msg);
+  };
+}
+
+function handleMessage(msg) {
+  const type = msg.type;
+  if (type === "ping") { ws.send(JSON.stringify({type:"pong"})); return; }
+  if (type === "runtime_state") {
+    agentRunning = !!msg.running;
+    if (agentRunning) { setStatus("ok","Processing…"); showTyping(); }
+    else { setStatus("ok","Connected"); }
+    return;
+  }
+  if (type === "progress") {
+    const kind = msg.kind;
+    if (kind === "token") { if (!currentStreamEl) startStream(); appendStream(msg.content||""); }
+    else if (kind === "tool_call") { hideTyping(); addToolIndicator(msg.tool||"tool",msg.args||""); }
+    else if (kind === "text") { if (!currentStreamEl) startStream(); appendStream(msg.content||""); }
+    return;
+  }
+  if (type === "response") {
+    agentRunning = false; hideTyping(); removeToolIndicators();
+    const content = msg.content || "";
+    if (currentStreamEl) { finalizeStream(content, msg.duration_ms); }
+    else if (content) {
+      const bubble = addMessage("agent", content);
+      if (msg.duration_ms) {
+        const meta = document.createElement("div"); meta.className = "meta";
+        meta.textContent = `${(msg.duration_ms/1000).toFixed(1)}s`;
+        bubble.parentElement.appendChild(meta);
+      }
+    }
+    setStatus("ok","Connected"); return;
+  }
+  if (type === "error") {
+    agentRunning = false; hideTyping(); removeToolIndicators(); finalizeStream(null);
+    addMessage("agent", `⚠️ ${msg.content||"An error occurred."}`);
+    setStatus("ok","Connected"); return;
+  }
+  if (type === "confirm_command") {
+    ws.send(JSON.stringify({type:"confirm_response",confirm_id:msg.confirm_id,approved:true})); return;
+  }
+  if (type === "confirm_path") {
+    ws.send(JSON.stringify({type:"confirm_response",confirm_id:msg.confirm_id,approval:"allow_dir"})); return;
+  }
+}
+
+function sendMessage() {
+  const text = inputEl.value.trim();
+  if (!text || !connected) return;
+  if (text === "/clear") { messagesEl.innerHTML = ""; inputEl.value = ""; autoResize(); return; }
+  addMessage("user", text);
+  ws.send(JSON.stringify({content:text}));
+  inputEl.value = ""; autoResize();
+  agentRunning = true; setStatus("ok","Processing…"); showTyping();
+}
+
+function autoResize() {
+  inputEl.style.height = "auto";
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
+}
+
+sendBtn.addEventListener("click", sendMessage);
+inputEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+inputEl.addEventListener("input", autoResize);
+
+document.querySelectorAll(".cmd-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const cmd = btn.dataset.cmd;
+    if (cmd === "/clear") { messagesEl.innerHTML = ""; return; }
+    if (connected) { addMessage("user",cmd); ws.send(JSON.stringify({content:cmd})); showTyping(); }
+  });
+});
+
+let commandsVisible = false;
+messagesEl.addEventListener("scroll", () => {
+  const atTop = messagesEl.scrollTop < 30;
+  if (atTop && !commandsVisible) { $("#commands").classList.add("show"); commandsVisible = true; }
+  else if (!atTop && commandsVisible) { $("#commands").classList.remove("show"); commandsVisible = false; }
+});
+
+// ── Session management ──
+
+const sessionOverlay = $("#session-overlay");
+const sessionPanel = $("#session-panel");
+const sessionList = $("#session-list");
+const newSessionInput = $("#new-session-input");
+
+function openSessionPanel() { sessionOverlay.classList.add("show"); sessionPanel.classList.add("show"); loadSessions(); }
+function closeSessionPanel() { sessionOverlay.classList.remove("show"); sessionPanel.classList.remove("show"); }
+
+function switchSession(key) {
+  currentSession = key; localStorage.setItem("pdagent_session", key);
+  messagesEl.innerHTML = ""; currentStreamEl = null; streamedText = "";
+  closeSessionPanel(); connect();
+}
+
+async function loadSessions() {
+  let sessions = [];
+  try {
+    const resp = await fetch(`${serverBase}/api/sessions?token=${authToken}`);
+    const data = await resp.json();
+    sessions = data.sessions || [];
+  } catch {}
+  const known = new Set(sessions.map(s => s.key || s));
+  known.add("mobile"); known.add(currentSession);
+  sessionList.innerHTML = "";
+  for (const key of known) {
+    const item = document.createElement("div");
+    item.className = "session-item" + (key === currentSession ? " active" : "");
+    item.innerHTML = `<span class="s-dot"></span><span class="s-name">${key}</span>`;
+    item.addEventListener("click", () => switchSession(key));
+    sessionList.appendChild(item);
+  }
+}
+
+function createSession() {
+  const name = newSessionInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+  if (!name) return;
+  newSessionInput.value = ""; switchSession(name);
+}
+
+$("#sessions-btn").addEventListener("click", openSessionPanel);
+sessionOverlay.addEventListener("click", closeSessionPanel);
+$("#session-panel-close").addEventListener("click", closeSessionPanel);
+$("#new-session-btn").addEventListener("click", createSession);
+newSessionInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); createSession(); }
+});
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+connect();
+
+} // end initChat
+
+bootstrap();
+
+})();
 </script>
 </body>
 </html>
