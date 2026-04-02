@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0b10">
+<link rel="manifest" href="manifest.json">
+<title>PDAgent</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0b10;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  display:flex;align-items:center;justify-content:center;height:100vh;height:100dvh;text-align:center}
+.container{padding:24px}
+.logo{font-size:48px;font-weight:800;color:#3b82f6;margin-bottom:16px;letter-spacing:-1px}
+.status{font-size:15px;color:#94a3b8;margin-bottom:24px}
+.spinner{width:32px;height:32px;border:3px solid #1e293b;border-top-color:#3b82f6;border-radius:50%;
+  animation:spin .8s linear infinite;margin:0 auto 20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error{color:#f87171;display:none;margin-top:16px;font-size:14px}
+.retry-btn{display:none;margin-top:12px;background:#3b82f6;color:#fff;border:none;border-radius:8px;
+  padding:10px 24px;font-size:14px;cursor:pointer}
+.retry-btn:active{background:#2563eb}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">PD</div>
+  <div class="spinner" id="spinner"></div>
+  <div class="status" id="status">Connecting to PDAgent…</div>
+  <div class="error" id="error"></div>
+  <button class="retry-btn" id="retry">Retry</button>
+</div>
+<script>
+const GIST_RAW = "https://gist.githubusercontent.com/Charlie-coder/1b492ad9a8842b2942c29ac8bb872cb4/raw/pdagent.json";
+const statusEl = document.getElementById("status");
+const errorEl = document.getElementById("error");
+const retryBtn = document.getElementById("retry");
+const spinnerEl = document.getElementById("spinner");
+
+async function redirect() {
+  statusEl.textContent = "Connecting to PDAgent…";
+  errorEl.style.display = "none";
+  retryBtn.style.display = "none";
+  spinnerEl.style.display = "block";
+
+  try {
+    const resp = await fetch(GIST_RAW + "?t=" + Date.now());
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const text = await resp.text();
+
+    let url;
+    try {
+      const data = JSON.parse(text);
+      url = data.url;
+    } catch {
+      const m = text.match(/\((https:\/\/[^)]+)\)/);
+      if (m) url = m[1];
+    }
+
+    if (url) {
+      statusEl.textContent = "Opening PDAgent…";
+      location.replace(url);
+    } else {
+      throw new Error("PDAgent is not running");
+    }
+  } catch (e) {
+    spinnerEl.style.display = "none";
+    statusEl.textContent = "Could not connect";
+    errorEl.textContent = e.message;
+    errorEl.style.display = "block";
+    retryBtn.style.display = "inline-block";
+  }
+}
+
+retryBtn.addEventListener("click", redirect);
+redirect();
+</script>
+</body>
+</html>
