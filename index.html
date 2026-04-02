@@ -12,7 +12,10 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0b10;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  display:flex;align-items:center;justify-content:center;height:100vh;height:100dvh;text-align:center}
+  height:100vh;height:100dvh;overflow:hidden}
+.loader{display:flex;align-items:center;justify-content:center;height:100%;text-align:center;
+  position:absolute;inset:0;z-index:10;background:#0a0b10}
+.loader.hidden{display:none}
 .container{padding:24px}
 .logo{font-size:48px;font-weight:800;color:#3b82f6;margin-bottom:16px;letter-spacing:-1px}
 .status{font-size:15px;color:#94a3b8;margin-bottom:24px}
@@ -23,24 +26,32 @@ body{background:#0a0b10;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFo
 .retry-btn{display:none;margin-top:12px;background:#3b82f6;color:#fff;border:none;border-radius:8px;
   padding:10px 24px;font-size:14px;cursor:pointer}
 .retry-btn:active{background:#2563eb}
+#app-frame{position:absolute;inset:0;width:100%;height:100%;border:none;display:none}
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="logo">PD</div>
-  <div class="spinner" id="spinner"></div>
-  <div class="status" id="status">Connecting to PDAgent…</div>
-  <div class="error" id="error"></div>
-  <button class="retry-btn" id="retry">Retry</button>
+<div class="loader" id="loader">
+  <div class="container">
+    <div class="logo">PD</div>
+    <div class="spinner" id="spinner"></div>
+    <div class="status" id="status">Connecting to PDAgent…</div>
+    <div class="error" id="error"></div>
+    <button class="retry-btn" id="retry">Retry</button>
+  </div>
 </div>
+<iframe id="app-frame" allow="clipboard-write"></iframe>
 <script>
 const GIST_RAW = "https://gist.githubusercontent.com/Charlie-coder/1b492ad9a8842b2942c29ac8bb872cb4/raw/pdagent.json";
+const loaderEl = document.getElementById("loader");
 const statusEl = document.getElementById("status");
 const errorEl = document.getElementById("error");
 const retryBtn = document.getElementById("retry");
 const spinnerEl = document.getElementById("spinner");
+const frameEl = document.getElementById("app-frame");
 
-async function redirect() {
+async function loadApp() {
+  loaderEl.classList.remove("hidden");
+  frameEl.style.display = "none";
   statusEl.textContent = "Connecting to PDAgent…";
   errorEl.style.display = "none";
   retryBtn.style.display = "none";
@@ -61,8 +72,11 @@ async function redirect() {
     }
 
     if (url) {
-      statusEl.textContent = "Opening PDAgent…";
-      location.replace(url);
+      statusEl.textContent = "Loading PDAgent…";
+      frameEl.src = url;
+      frameEl.style.display = "block";
+      frameEl.onload = () => { loaderEl.classList.add("hidden"); };
+      setTimeout(() => { loaderEl.classList.add("hidden"); }, 5000);
     } else {
       throw new Error("PDAgent is not running");
     }
@@ -75,8 +89,8 @@ async function redirect() {
   }
 }
 
-retryBtn.addEventListener("click", redirect);
-redirect();
+retryBtn.addEventListener("click", loadApp);
+loadApp();
 </script>
 </body>
 </html>
